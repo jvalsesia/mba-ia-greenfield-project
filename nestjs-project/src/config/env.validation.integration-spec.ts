@@ -1,4 +1,11 @@
+import type * as Joi from 'joi';
 import { envValidationSchema } from './env.validation';
+
+/** Shape of the validated env this suite asserts against. */
+interface ValidatedEnv {
+  SWAGGER_ENABLED: string;
+  [key: string]: unknown;
+}
 
 const requiredEnv = {
   DB_USERNAME: 'user',
@@ -8,11 +15,20 @@ const requiredEnv = {
   JWT_REFRESH_SECRET: 'refresh-secret',
 };
 
-const validate = (env: Record<string, string>) =>
+/**
+ * Joi types `ValidationResult.value` as `any`, which makes every assertion
+ * against it unsafe. Naming the result shape confines the cast to one place.
+ */
+interface EnvValidationResult {
+  value: ValidatedEnv;
+  error?: Joi.ValidationError;
+}
+
+const validate = (env: Record<string, string>): EnvValidationResult =>
   envValidationSchema.validate(
     { ...requiredEnv, ...env },
     { allowUnknown: true, abortEarly: false },
-  );
+  ) as EnvValidationResult;
 
 describe('envValidationSchema — SWAGGER_ENABLED', () => {
   it('should reject SWAGGER_ENABLED with an invalid value', () => {
