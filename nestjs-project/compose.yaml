@@ -5,6 +5,12 @@ services:
       dockerfile: Dockerfile.dev
     ports:
       - 3000:3000
+    # The queue name is read from process.env at module-load time, because
+    # @InjectQueue/@Processor resolve their DI token when the decorator
+    # evaluates — before ConfigModule runs. env_file puts it in the process
+    # environment before any application code executes.
+    env_file:
+      - .env
     volumes:
       - .:/home/node/app
     depends_on:
