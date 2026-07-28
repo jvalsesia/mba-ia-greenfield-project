@@ -38,7 +38,7 @@ export class VideosController {
   constructor(private readonly videosService: VideosService) {}
 
   @Post('uploads')
-  @ApiBearerAuth()
+  @ApiBearerAuth('access-token')
   @ApiOperation({
     summary: 'Start a video upload',
     description:
@@ -74,7 +74,7 @@ export class VideosController {
 
   @Post(':videoId/uploads/complete')
   @HttpCode(HttpStatus.OK)
-  @ApiBearerAuth()
+  @ApiBearerAuth('access-token')
   @ApiOperation({
     summary: 'Finish a video upload',
     description:
@@ -112,7 +112,7 @@ export class VideosController {
 
   @Delete(':videoId/upload')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiBearerAuth()
+  @ApiBearerAuth('access-token')
   @ApiOperation({
     summary: 'Cancel a video upload',
     description:

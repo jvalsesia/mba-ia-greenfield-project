@@ -2,7 +2,10 @@ import { DataSource, QueryFailedError, Repository } from 'typeorm';
 import { RefreshToken } from '../../auth/entities/refresh-token.entity';
 import { VerificationToken } from '../../auth/entities/verification-token.entity';
 import { Channel } from '../../channels/entities/channel.entity';
-import { createTestDataSource } from '../../test/create-test-data-source';
+import {
+  cleanAllTables,
+  createTestDataSource,
+} from '../../test/create-test-data-source';
 import { User } from '../../users/entities/user.entity';
 import { generatePublicId } from '../public-id.util';
 import { Video, VideoStatus } from './video.entity';
@@ -29,9 +32,10 @@ describe('Video entity (integration)', () => {
   });
 
   beforeEach(async () => {
-    await dataSource.query('DELETE FROM "videos"');
-    await dataSource.query('DELETE FROM "channels"');
-    await dataSource.query('DELETE FROM "users"');
+    // Use the shared helper rather than an ad-hoc delete list: other suites
+    // leave token rows referencing users, and deleting users without clearing
+    // those first trips their foreign keys.
+    await cleanAllTables(dataSource);
   });
 
   async function createChannel(): Promise<Channel> {

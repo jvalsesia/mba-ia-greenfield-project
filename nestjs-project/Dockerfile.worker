@@ -1,0 +1,11 @@
+FROM node:25.6.0-slim
+
+# The worker is the only runtime that needs FFmpeg. Keeping it in a separate
+# image is why the API image stays lean (phase-03-videos/TD-04).
+RUN apt update && apt install -y procps ffmpeg && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /home/node/app
+
+USER node
+
+CMD [ "npm", "run", "worker:dev" ]

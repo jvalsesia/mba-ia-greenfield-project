@@ -31,6 +31,11 @@ describe('VideoQueueService (integration)', () => {
 
     service = module.get(VideoQueueService);
     queue = module.get(getQueueToken(VIDEO_QUEUE_NAME));
+
+    // The video-worker container consumes this same queue, so an enqueued job
+    // would be picked up before the assertions could see it. Pausing makes the
+    // queue's contents observable; it is resumed in afterAll.
+    await queue.pause();
   });
 
   beforeEach(async () => {
@@ -39,6 +44,7 @@ describe('VideoQueueService (integration)', () => {
 
   afterAll(async () => {
     await queue.obliterate({ force: true });
+    await queue.resume();
     await queue.close();
   });
 

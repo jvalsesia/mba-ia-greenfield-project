@@ -1,4 +1,3 @@
-import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   ArrayNotEmpty,
@@ -11,22 +10,19 @@ import {
 } from 'class-validator';
 
 export class UploadPartDto {
-  @ApiProperty({ minimum: 1, example: 1 })
+  /** 1-based part index, as sent to storage. */
   @IsInt()
   @Min(1)
   partNumber: number;
 
-  @ApiProperty({
-    description: 'ETag returned by storage for this part.',
-    example: '"9bb58f26192e4ba00f01e2e7b136bbd8"',
-  })
+  /** ETag storage returned for this part. */
   @IsString()
   @IsNotEmpty()
   etag: string;
 }
 
 export class CompleteUploadDto {
-  @ApiProperty({ type: [UploadPartDto] })
+  /** Every uploaded part. Order does not matter — the server sorts before completing. */
   @IsArray()
   @ArrayNotEmpty()
   @ValidateNested({ each: true })
