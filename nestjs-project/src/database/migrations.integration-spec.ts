@@ -14,6 +14,13 @@ const MANAGED_TABLES = [
   'verification_tokens',
 ];
 
+// Enum types are schema objects independent of the tables that use them:
+// `DROP TABLE ... CASCADE` does not remove them. The suite must therefore drop
+// them explicitly, or the second consecutive run fails on `CREATE TYPE` with
+// "type already exists" — the previous run's `afterAll` re-applied the
+// migrations and left the enum behind.
+const MANAGED_ENUM_TYPES = ['verification_tokens_type_enum'];
+
 describe('Database migrations (integration)', () => {
   let dataSource: DataSource;
 
@@ -37,6 +44,13 @@ describe('Database migrations (integration)', () => {
       ),
       dataSource.query(`DROP TABLE IF EXISTS "migrations" CASCADE`),
     ]);
+
+    // Runs after the tables are gone, so nothing still depends on the types.
+    await Promise.all(
+      MANAGED_ENUM_TYPES.map((type) =>
+        dataSource.query(`DROP TYPE IF EXISTS "public"."${type}" CASCADE`),
+      ),
+    );
   });
 
   afterAll(async () => {
