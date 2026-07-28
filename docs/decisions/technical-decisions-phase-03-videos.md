@@ -274,6 +274,9 @@ _Subprojects in scope:_
 
 **Decision:** A (`draft` → `processing` → `ready` | `failed`, 3 retries with backoff)
 
+**Revisions:**
+- 2026-07-28 — Added explicit stalled-job settings: `stalledInterval: 60_000` (ms) and `maxStalledCount: 2`; a job exceeding the stall budget is treated as a failed attempt and follows the same terminal path, setting the video to `failed` with `processing_error`. Rationale: resolves `OQ-1` from `validation.md`. TD-06 makes jobs long-lived by design (probing a 10GB object over HTTP), so a default stall window risks re-queuing a job that is still running, and leaving the setting unstated left `processing` without a terminal state when a worker dies mid-job.
+
 ---
 
 ## TD-10: Test Strategy for Storage, Queue and FFmpeg
@@ -300,6 +303,71 @@ _Subprojects in scope:_
 
 **Decision:** A (Real MinIO, Redis and FFmpeg in integration and e2e)
 
+**Revisions:**
+- 2026-07-28 — `ffmpeg` is installed in `Dockerfile.dev` in addition to `Dockerfile.worker`. Rationale: resolves `IC-2` from `validation.md`. TD-04 keeps FFmpeg out of the API image, but the project convention (`nestjs-project/CLAUDE.md`) runs every test inside the `nestjs-api` container, whose image had neither binary — so FFmpeg-touching integration specs would have failed with `ENOENT`. Installing it in the *dev* image only keeps the production API image unchanged and keeps the whole suite runnable with a single command in a single container.
+
+---
+
+## TD-11: Authorization Model for Video Delivery
+
+**Scope:** Backend
+
+**Capability:** Transversal — covers: `Reprodução via streaming (sem necessidade de download completo)`, `Download do vídeo pelo usuário`
+
+**Context:** Raised as `AMB-1` in `validation.md`. TD-08 decides the delivery *mechanism* (a `302` to a presigned URL issued only after the API checks the video) but never states what that check is. The gap is real rather than merely unstated, because the natural discriminator does not exist yet: `Visibilidade do vídeo: público ou unlisted` is a **Fase 04** capability, so Phase 03 has no visibility column to consult. Meanwhile the global `JwtAuthGuard` inherited from Phase 02 denies every route by default unless annotated `@Public()`, so silence here means "authenticated-only" by accident rather than by decision.
+
+**Options:**
+
+### Option A: `ready` videos are publicly streamable and downloadable; non-`ready` videos are owner-only
+- `GET /videos/:publicId/stream` and `GET /videos/:publicId/download` are `@Public()`. Both resolve the video by `public_id` and serve it only when `status = ready`. A video in `draft`, `processing` or `failed` returns `404` to everyone except the owning channel, which sees its real status.
+- **Pros:** Matches the project's stated characteristic — *"qualquer pessoa pode assistir vídeos sem cadastro"* — without inventing a rule the plan does not contain. Returning `404` rather than `403` for non-`ready` videos avoids leaking the existence of an unprocessed upload. Phase 04 layers its visibility check on top of the same resolver without restructuring anything.
+- **Cons:** Until Phase 04 ships visibility, every `ready` video is world-readable — there is no way to keep one unlisted in the interim.
+
+### Option B: Streaming public, download authenticated
+- `/stream` is `@Public()`; `/download` requires a valid JWT.
+- **Pros:** Slightly raises the cost of bulk scraping of original files while keeping playback open.
+- **Cons:** Invents a restriction the project plan does not ask for — the bullet says only `Download do vídeo pelo usuário`. Asymmetric rules on two endpoints serving the same object are hard to justify and easy to forget.
+
+### Option C: Both endpoints owner-only in this phase
+- Phase 03 delivers the mechanism; Phase 04 opens it to the public alongside visibility.
+- **Pros:** Most conservative; nothing is exposed before the visibility model exists.
+- **Cons:** Directly contradicts the anonymous-access characteristic already declared in `docs/project-plan.md`, and would make the phase's own streaming deliverable unverifiable from an anonymous client.
+
+**Recommendation:** **Option A.** It is the only option that follows the project plan as written rather than adding or withholding a rule; the anonymous-access characteristic is stated at the top of `docs/project-plan.md` and applies from the moment videos become playable. The interim exposure that Option A accepts is bounded — a `ready` video in Phase 03 is one its owner uploaded and processed successfully, and Phase 04 introduces visibility as a filter over the same resolver rather than as a rewrite. `404`-for-non-`ready` keeps unprocessed uploads invisible.
+
+**Decision:** A (`ready` → public stream + download; non-`ready` → owner-only, `404` otherwise)
+
+---
+
+## TD-12: Abandoned Multipart Upload Cleanup
+
+**Scope:** Backend
+
+**Capability:** Pré-cadastro automático do vídeo como rascunho ao iniciar o upload
+
+**Context:** Raised as `MD-1` in `validation.md`. TD-02's Cons name the cost — *"Orphaned multipart uploads accumulate storage until aborted by a lifecycle rule or a cleanup routine"* — but no TD decides the treatment. This is the expected outcome of any interrupted transfer at the file sizes this phase targets, and it leaves two artefacts behind: a `draft` video row and billable multipart parts in the bucket.
+
+**Options:**
+
+### Option A: Explicit abort endpoint
+- `DELETE /videos/:id/upload`, authorised to the owning channel, calls `AbortMultipartUpload` and deletes the `draft` row.
+- **Pros:** Gives the client a first-class way to cancel, which a 10GB upload UI needs regardless. End-to-end testable with the real MinIO already in the stack — the abort is observable via `ListMultipartUploads`. Small, self-contained SI.
+- **Cons:** Only covers clients that *tell* us they are giving up; a client that simply disappears still leaks.
+
+### Option B: Abort endpoint plus a bucket lifecycle rule
+- Option A, plus an `AbortIncompleteMultipartUpload` rule (e.g. 7 days) applied to the video bucket during MinIO bootstrap.
+- **Pros:** Also covers silent abandonment, closing the leak completely.
+- **Cons:** One more bootstrap step to write and to test, and a rule whose effect is only observable after days — awkward to cover meaningfully in the suite.
+
+### Option C: Defer cleanup to Phase 04
+- Record the debt; let the phase that owns the draft→publish flow implement it.
+- **Pros:** Keeps this phase smaller.
+- **Cons:** Ships a known storage leak with no client-facing way to cancel an upload in progress.
+
+**Recommendation:** **Option A.** It closes the case that the client can actually signal and gives the upload flow the cancel path it needs, at the cost of one small endpoint that the real MinIO in Compose can verify end to end. Option B's lifecycle rule is the right long-term complement but buys coverage for silent abandonment that no test in this phase could meaningfully assert; it is recorded here as the natural follow-up rather than dropped. Option C leaves the phase without a cancel path at all.
+
+**Decision:** A (Explicit `DELETE /videos/:id/upload` abort endpoint; bucket lifecycle rule noted as a follow-up)
+
 ---
 
 ## Decisions Summary
@@ -316,6 +384,8 @@ _Subprojects in scope:_
 | TD-08 | Backend | Streaming and download delivery path | A — `302` to short-lived presigned GET URL | A |
 | TD-09 | Backend | Video status lifecycle and failure handling | A — `draft`→`processing`→`ready`\|`failed`, 3 retries | A |
 | TD-10 | Backend | Test strategy for storage, queue and FFmpeg | A — Real MinIO/Redis/FFmpeg in integration and e2e | A |
+| TD-11 | Backend | Authorization model for video delivery | A — `ready` public; non-`ready` owner-only | A |
+| TD-12 | Backend | Abandoned multipart upload cleanup | A — Explicit `DELETE /videos/:id/upload` abort endpoint | A |
 
 ---
 
