@@ -31,6 +31,19 @@ function isPgUniqueViolationOnColumn(err: unknown, column: string): boolean {
 export class ChannelsService {
   constructor(private readonly dataSource: DataSource) {}
 
+  /**
+   * Resolves the channel owned by a user (1:1, created at registration).
+   *
+   * Video upload needs this on every initiation. It lives here rather than in
+   * `VideosService` because `channels` is this module's table — see the Single
+   * Responsibility rule in the root `CLAUDE.md`.
+   */
+  async findByUserId(userId: string): Promise<Channel | null> {
+    return this.dataSource
+      .getRepository(Channel)
+      .findOne({ where: { user_id: userId } });
+  }
+
   async createChannel(userId: string, email: string): Promise<Channel> {
     const baseNickname = sanitizeNickname(email.split('@')[0]);
 

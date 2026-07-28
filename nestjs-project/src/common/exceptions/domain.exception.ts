@@ -9,6 +9,12 @@ export abstract class DomainException extends Error {
   }
 }
 
+export class ChannelNotFoundException extends DomainException {
+  constructor() {
+    super('CHANNEL_NOT_FOUND', 404, 'No channel found for this user');
+  }
+}
+
 export class EmailAlreadyExistsException extends DomainException {
   constructor() {
     super('EMAIL_ALREADY_EXISTS', 409, 'Email is already registered');
