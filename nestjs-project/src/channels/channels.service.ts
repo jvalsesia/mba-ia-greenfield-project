@@ -7,13 +7,23 @@ const PG_UNIQUE_VIOLATION = '23505';
 const NICKNAME_COLUMN = 'nickname';
 const MAX_RETRIES = 5;
 
+/**
+ * `QueryFailedError` copies the driver error's own properties onto itself, so a
+ * PostgreSQL failure carries `code` and `detail` — neither of which is on the
+ * declared type. This narrows to exactly those two fields instead of `any`.
+ */
+type PostgresQueryFailedError = QueryFailedError & {
+  code?: string;
+  detail?: string;
+};
+
 function isPgUniqueViolationOnColumn(err: unknown, column: string): boolean {
   if (!(err instanceof QueryFailedError)) return false;
-  const e = err as any;
+  const pgError = err as PostgresQueryFailedError;
   return (
-    e.code === PG_UNIQUE_VIOLATION &&
-    typeof e.detail === 'string' &&
-    e.detail.includes(column)
+    pgError.code === PG_UNIQUE_VIOLATION &&
+    typeof pgError.detail === 'string' &&
+    pgError.detail.includes(column)
   );
 }
 
