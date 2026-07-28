@@ -33,4 +33,5 @@ export const SUPPORTED_VIDEO_MIME_TYPES = [
   'video/webm',
 ] as const;
 
-export type SupportedVideoMimeType = (typeof SUPPORTED_VIDEO_MIME_TYPES)[number];
+export type SupportedVideoMimeType =
+  (typeof SUPPORTED_VIDEO_MIME_TYPES)[number];

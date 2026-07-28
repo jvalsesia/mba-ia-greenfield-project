@@ -2,7 +2,10 @@ import type { ConfigType } from '@nestjs/config';
 import type { Queue } from 'bullmq';
 import queueConfig from '../config/queue.config';
 import { VideoQueueService } from './video-queue.service';
-import { PROCESS_VIDEO_JOB, type ProcessVideoJobData } from './videos.constants';
+import {
+  PROCESS_VIDEO_JOB,
+  type ProcessVideoJobData,
+} from './videos.constants';
 
 describe('VideoQueueService', () => {
   const config = {

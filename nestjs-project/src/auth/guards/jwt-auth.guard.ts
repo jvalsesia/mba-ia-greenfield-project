@@ -22,12 +22,20 @@ export class JwtAuthGuard implements CanActivate {
       context.getHandler(),
       context.getClass(),
     ]);
-    if (isPublic) return true;
-
     const request = context
       .switchToHttp()
       .getRequest<{ headers: Record<string, string>; user: unknown }>();
     const authHeader = request.headers?.authorization;
+
+    if (isPublic) {
+      // A public route never requires a token, but some of them behave
+      // differently for a signed-in caller — a video owner can see their own
+      // unprocessed upload, for instance. Attach the principal when one is
+      // present and valid, and stay silent otherwise so anonymous requests
+      // and bad tokens both simply proceed unauthenticated.
+      await this.attachUserIfPresent(request, authHeader);
+      return true;
+    }
 
     if (!authHeader || !authHeader.startsWith(BEARER_PREFIX)) {
       throw new UnauthorizedException();
@@ -41,6 +49,22 @@ export class JwtAuthGuard implements CanActivate {
       return true;
     } catch {
       throw new UnauthorizedException();
+    }
+  }
+
+  private async attachUserIfPresent(
+    request: { user: unknown },
+    authHeader: string | undefined,
+  ): Promise<void> {
+    if (!authHeader?.startsWith(BEARER_PREFIX)) return;
+
+    try {
+      request.user = await this.jwtService.verifyAsync<JwtPayload>(
+        authHeader.slice(BEARER_PREFIX.length),
+      );
+    } catch {
+      // An invalid token on a public route is not an error — the caller is
+      // simply treated as anonymous.
     }
   }
 }
