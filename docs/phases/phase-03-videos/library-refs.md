@@ -9,12 +9,12 @@ libs:
     resolved: "11.0.4"
     source: npm-registry
   - name: "@aws-sdk/client-s3"
-    version: "^3.1096.0"
-    resolved: "3.1096.0"
+    version: "^3.1097.0"
+    resolved: "3.1097.0"
     source: npm-registry
   - name: "@aws-sdk/s3-request-presigner"
-    version: "^3.1096.0"
-    resolved: "3.1096.0"
+    version: "^3.1097.0"
+    resolved: "3.1097.0"
     source: npm-registry
   - name: ffmpeg
     version: "distro build (Debian bookworm, node:25.6.0-slim base)"
@@ -36,7 +36,17 @@ Substitutes actually used, in order of authority:
 1. **npm registry metadata** (`https://registry.npmjs.org/<pkg>/latest`, read 2026-07-28) — authoritative for version, license, `engines`, `type` (ESM/CJS), `main`/`exports`, `peerDependencies` and `dependencies`. These are the facts that decide compatibility with the installed stack, and they are read from the registry rather than recalled.
 2. **Official vendor documentation** — AWS S3 user guide for the multipart limits cited in `TD-02`.
 
-**Obligation carried into implementation:** every version below is a registry `latest` at research time, not yet an installed version. `SI-03.1` installs them and must re-confirm the resolved versions against `nestjs-project/package-lock.json`; any divergence is recorded here as a revision before dependent SIs proceed.
+**Obligation carried into implementation:** every version below was a registry `latest` at research time, not yet an installed version. `SI-03.1` installs them and must re-confirm the resolved versions against `nestjs-project/package-lock.json`; any divergence is recorded here as a revision before dependent SIs proceed.
+
+**Post-install reconciliation (SI-03.1, 2026-07-28).** Confirmed against the installed tree:
+
+| Package | Recorded at research | Actually resolved | Outcome |
+|---|---|---|---|
+| `bullmq` | 5.81.2 | **5.81.2** | Matches |
+| `@nestjs/bullmq` | 11.0.4 | **11.0.4** | Matches |
+| `@aws-sdk/client-s3` | 3.1096.0 | **3.1097.0** | **Diverged** — a patch release landed between research and install. Same major/minor; the commands and the `forcePathStyle` requirement documented below are unaffected. Pins updated above. |
+| `@aws-sdk/s3-request-presigner` | 3.1096.0 | **3.1097.0** | **Diverged** — same release train as the client, which is exactly why the two must move together. Pins updated above. |
+| `ioredis` | 5.11.1 (transitive) | **5.11.1** | Matches — arrives via `bullmq`, not installed directly. |
 
 ---
 
@@ -78,7 +88,7 @@ Read from `nestjs-project/package.json` and `tsconfig.json`:
 
 **Wiring note for `TD-04`.** The worker entrypoint bootstraps with `NestFactory.createApplicationContext`, which starts providers without an HTTP listener. The `@Processor` class must therefore live in a module imported by the worker's root module and **not** by the API's, or the API would also consume jobs — defeating the process separation the TD decides.
 
-## `@aws-sdk/client-s3@^3.1096.0` — object storage (`TD-02`, `TD-03`, `TD-06`, `TD-08`, `TD-12`)
+## `@aws-sdk/client-s3@^3.1097.0` — object storage (`TD-02`, `TD-03`, `TD-06`, `TD-08`, `TD-12`)
 
 **Compatibility check.** Apache-2.0, CommonJS-compatible dual build, no `engines` floor above the container's Node 25. Modular v3 client — only the S3 client package is installed, not a monolithic SDK.
 
@@ -104,7 +114,7 @@ Read from `nestjs-project/package.json` and `tsconfig.json`:
 
 **Signing note relevant to `TD-08`.** The signature covers the request the URL was signed for, so `response-content-disposition` must be passed as a parameter to `GetObjectCommand` **before** signing, not appended to the finished URL — appending it after signing invalidates the signature.
 
-## `@aws-sdk/s3-request-presigner@^3.1096.0` — presigned URLs (`TD-02`, `TD-06`, `TD-08`)
+## `@aws-sdk/s3-request-presigner@^3.1097.0` — presigned URLs (`TD-02`, `TD-06`, `TD-08`)
 
 **Compatibility check.** Versioned and released in lockstep with `@aws-sdk/client-s3`; both must be pinned to the same minor to avoid signer/client drift.
 
@@ -142,4 +152,4 @@ TTLs decided by the TDs, collected here because they are the values the implemen
 | `fluent-ffmpeg` | 2.1.3 (+ `@types/fluent-ffmpeg` 2.1.28) | Two packages for two command lines; wraps the FFmpeg stderr that is the only useful failure signal. Rejected by `TD-05`. |
 | `pg-boss` | 12.26.3 | No first-party NestJS integration; would place a second schema owner inside the project's own database. Rejected by `TD-01`. |
 | `amqplib` / `@golevelup/nestjs-rabbitmq` | 2.0.1 / 9.0.2 | Broker weight unjustified at one producer and one consumer; retry-with-backoff needs manual DLX/TTL plumbing. Rejected by `TD-01`. |
-| `@aws-sdk/lib-storage` | 3.1096.0 | Its `Upload` helper performs multipart **server-side**, which is precisely the data path `TD-02` removes. Not installed. |
+| `@aws-sdk/lib-storage` | 3.1097.0 | Its `Upload` helper performs multipart **server-side**, which is precisely the data path `TD-02` removes. Not installed. |

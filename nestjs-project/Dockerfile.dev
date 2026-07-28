@@ -1,6 +1,10 @@
 FROM node:25.6.0-slim
 
-RUN apt update && apt install -y procps curl
+# ffmpeg/ffprobe are required by the video processing integration specs
+# (phase-03-videos/TD-10, resolving IC-2). The project's convention runs every
+# test inside this container, so the binaries must be here as well as in
+# Dockerfile.worker. The production API image carries neither.
+RUN apt update && apt install -y procps curl ffmpeg
 
 WORKDIR /home/node/app
 
