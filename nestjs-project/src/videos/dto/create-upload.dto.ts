@@ -30,9 +30,11 @@ export class CreateUploadDto {
   mimeType: SupportedVideoMimeType;
 
   /**
-   * Declared size in bytes, used to derive the part count. Checked against the
-   * 10 GiB ceiling here; the stored size is re-read from storage on completion,
-   * so a dishonest declaration cannot corrupt the record.
+   * Declared size in bytes, used to derive the part count. The 10 GiB ceiling
+   * is enforced in `VideosService.initiateUpload` against the configured
+   * `UPLOAD_MAX_SIZE_BYTES`, not by a decorator here, so the limit stays
+   * configurable per environment. The stored size is re-read from storage on
+   * completion, so a dishonest declaration cannot corrupt the record.
    */
   @IsInt()
   @IsPositive()
