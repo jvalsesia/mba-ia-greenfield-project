@@ -26,7 +26,15 @@ export function createTestDataSource(
   });
 }
 
+/**
+ * Wipes every table, children before parents.
+ *
+ * Order matters: `videos` references `channels`, so deleting channels first
+ * fails on the foreign key. Any new table with a dependency belongs above the
+ * table it points at.
+ */
 export async function cleanAllTables(dataSource: DataSource): Promise<void> {
+  await dataSource.query('DELETE FROM "videos"');
   await dataSource.query('DELETE FROM "refresh_tokens"');
   await dataSource.query('DELETE FROM "verification_tokens"');
   await dataSource.query('DELETE FROM "channels"');
